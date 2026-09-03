@@ -1,0 +1,6 @@
+build/
+mx.scratch/
+Debug/
+Release/
+.settings/
+*.launch
