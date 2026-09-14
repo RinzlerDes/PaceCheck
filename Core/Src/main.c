@@ -40,6 +40,7 @@
 #include "menu.h"
 #include "oled.h"
 #include "rgb_led.h"
+#include "capture_engine.h"
 
 int main(void)
 {
@@ -47,6 +48,7 @@ int main(void)
     console_init();
     oled_init();
     rgb_init();
+    capture_engine_init();
 
     printf("\n");
     printf("PC-1000 PaceCheck starter -- SWEN 563 / CMPE 663\n");
