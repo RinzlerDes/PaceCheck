@@ -81,6 +81,8 @@ int main(void) {
   char line[80];
   char* tok[8];
   oled_clear();
+  uint32_t startup_reset_counter = 0;
+
   for (;;) {
     my_flag = false;
     uint32_t startup = TIM2->CNT;
@@ -99,18 +101,24 @@ int main(void) {
 
     char* message = "NO DUT SIGNAL";
     char* message2 = "(no edge within 100 ms)";
-    char* message3 = "keypress to retry";
+    char* message3 = "> keypress to retry";
+    char message4[21];
+    snprintf(message4, sizeof(message4), "retry count: %u", startup_reset_counter);
 
     printf("%s\n", message);
     printf("%s\n", message2);
+    printf("%s\n", message4);
     printf("%s\n", message3);
 
     oled_write_line(0, message);
     oled_write_line(1, message2);
-    oled_write_line(2, message3);
+    oled_write_line(3, message4);
+    oled_write_line(4, message3);
 
     console_getc();
+    startup_reset_counter++;
   }
+  capture_engine_init();
 
   for (;;) {
     char line[80];
