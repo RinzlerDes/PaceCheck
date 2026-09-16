@@ -273,15 +273,94 @@ static void on_run(const menu_settings_t* s) {
     printf("\n");
 
     if (pass) {
-        rgb_set(0, 10, 0);
+        rgb_set(0u, 10u, 0u);
     } else {
-        rgb_set(10, 0, 0);
+        rgb_set(10u, 0u, 0u);
     }
 
     oled_clear();
     oled_printf(0u, "%s", verdict);
     oled_printf(1u, "Min: %lu", min);
     oled_printf(2u, "Max: %lu", max);
+
+    static uint32_t duty_bins[BINS_SIZE];
+    memset(duty_bins, 0u, sizeof(duty_bins[0]) * BINS_SIZE);
+
+    uint32_t duty_min = UINT32_MAX;
+    uint32_t duty_max = 0u;
+    uint32_t duty_count = 0u;
+    uint32_t invalid_duty_count = 0u;
+
+    uint64_t duty_sum = 0u;
+    uint64_t duty_sum_squared = 0u;
+
+    for (uint32_t i = 0u; i < result->measurements_count; i++) {
+        uint32_t period = result->measurements[i];
+        uint32_t high_time = result->high_times[i];
+
+        if (period == 0u) {
+            continue;
+        }
+
+        // uint32_t duty = (high_time) / (period * 100);
+        uint32_t duty = (1000u * high_time) / (period);
+
+        duty_sum += duty;
+        duty_sum_squared += (uint64_t)duty * duty;
+
+        if (duty < duty_min) {
+            duty_min = duty;
+        }
+
+        if (duty > duty_max) {
+            duty_max = duty;
+        }
+
+        duty_bins[duty] += 1;
+        duty_count++;
+    }
+
+    for (uint32_t duty = 0u; duty < BINS_SIZE; duty++) {
+        if (duty_bins[duty] == 0u) {
+            continue;
+        }
+
+        printf("%lu.%lu%%: %lu\n", duty / 10u, duty % 10u, duty_bins[duty]);
+    }
+
+    printf("Duty Total: %lu\n", (unsigned long)duty_count);
+
+    uint32_t duty_mean = (uint32_t)((duty_sum + duty_count / 2u) / duty_count);
+
+    uint64_t duty_variance = (((uint64_t)duty_count * duty_sum_squared) - (duty_sum * duty_sum)) /
+                             ((uint64_t)duty_count * (duty_count - 1u));
+
+    uint32_t duty_standard_deviation = isqrt_u64(duty_variance);
+
+    printf("Duty Min: %lu.%lu\n", duty_min / 10u, duty_min % 10u);
+
+    printf("Duty Max: %lu.%lu\n", duty_max / 10u, duty_max % 10u);
+
+    printf("Duty Mean: %lu.%lu\n", duty_mean / 10u, duty_mean % 10u);
+
+    //     uint32_t duty_mean = 0u;
+    // uint32_t duty_standard_deviation = 0u;
+
+    // if (duty_count != 0u) {
+    //     duty_mean =
+    //         (uint32_t)((duty_sum + duty_count / 2u) /
+    //                    duty_count);
+    // }
+
+    // if (duty_count > 1u) {
+    //     uint64_t duty_variance =
+    //         ((uint64_t)duty_count * duty_sum_squared -
+    //          duty_sum * duty_sum) /
+    //         ((uint64_t)duty_count * (duty_count - 1u));
+
+    //     duty_standard_deviation =
+    //         isqrt_u64(duty_variance);
+    // }
 }
 
 /* ==================== END STUDENT SECTIONS ============================== */

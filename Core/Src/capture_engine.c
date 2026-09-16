@@ -15,22 +15,27 @@
 static volatile bool edge_detected;
 static volatile bool first_edge = true;
 // volatile uint32_t my_number = 0;
-volatile uint32_t prev = 0;
+static volatile uint32_t prev = 0;
 // volatile uint32_t my_delta = 0;
 // volatile uint32_t measurements[MENU_N_FIXED];
-volatile bool measurement_complete = false;
+static volatile bool measurement_complete = false;
 // static volatile uint32_t tolerance = 0;
 // static volatile uint32_t measurement_count = 0;
 // static uint32_t dummy_data[1000];
 // volatile uint32_t out_low_count = 0;
 // volatile uint32_t out_high_count = 0;
-volatile uint32_t tolerance_lower = 0;
-volatile uint32_t tolerance_upper = 0;
+static volatile uint32_t tolerance_lower = 0;
+static volatile uint32_t tolerance_upper = 0;
 // uint32_t measurements_per_run = 0;
 // static capture_engine_result result = { .out_low_count = 0u,
 //                                                  .out_high_count = 0u,
 //                                                  .bins = bins };
 static volatile capture_engine_result result;
+
+static volatile bool edge_rose = false;
+static volatile bool edge_fell = false;
+static volatile uint32_t rising_ts = 0;
+static volatile uint32_t high_time = 0;
 
 static uint32_t dummy_data[1000] = {
     980, 982, 992, 986, 995, 993, 990, 986, 995, 993, 991, 994, 991, 988, 995, 992, 989, 990, 994,
@@ -92,6 +97,60 @@ static uint32_t dummy_data[1000] = {
     987, 990,  987, 991, 995, 991, 994, 990, 986, 993, 994, 993
 };
 
+static const uint32_t dummy_high_times[1000] = {
+    491, 491, 496, 493, 498, 497, 495, 493, 498, 497, 496, 497, 496, 494, 498, 495, 494, 495, 497, 494,
+    494, 493, 493, 492, 494, 496, 496, 493, 496, 494, 498, 497, 495, 494, 494, 493, 496, 494, 496, 494,
+    496, 498, 497, 498, 495, 497, 496, 497, 493, 494, 495, 496, 497, 493, 494, 493, 499, 497, 498, 495,
+    493, 498, 493, 494, 493, 497, 493, 498, 494, 496, 496, 495, 498, 497, 496, 493, 498, 496, 494, 498,
+    499, 494, 491, 495, 494, 496, 493, 497, 495, 496, 496, 497, 492, 496, 494, 494, 493, 493, 497, 493,
+    499, 498, 498, 493, 493, 499, 495, 495, 495, 493, 497, 493, 496, 493, 496, 495, 496, 496, 496, 493,
+    496, 498, 494, 494, 494, 498, 493, 497, 497, 499, 497, 494, 495, 494, 492, 494, 496, 494, 495, 497,
+    497, 498, 494, 495, 494, 497, 497, 495, 496, 493, 494, 493, 495, 495, 492, 493, 493, 494, 496, 495,
+    497, 494, 494, 493, 496, 495, 496, 494, 496, 494, 499, 496, 495, 497, 495, 497, 497, 497, 494, 498,
+    499, 491, 496, 494, 497, 494, 497, 494, 497, 492, 493, 496, 495, 492, 494, 494, 494, 498, 494, 497,
+    498, 493, 494, 495, 497, 494, 495, 497, 498, 498, 497, 497, 495, 497, 494, 497, 493, 493, 497, 496,
+    494, 493, 498, 494, 495, 496, 497, 493, 493, 493, 497, 496, 496, 496, 498, 493, 494, 496, 496, 497,
+    498, 493, 496, 493, 496, 494, 493, 493, 495, 495, 495, 495, 495, 499, 497, 491, 495, 494, 498, 493,
+    498, 494, 498, 496, 497, 495, 493, 494, 496, 493, 497, 493, 494, 496, 494, 495, 494, 492, 495, 497,
+    497, 498, 498, 498, 498, 495, 497, 495, 495, 494, 495, 494, 493, 495, 498, 495, 493, 497, 493, 495,
+    497, 496, 499, 495, 498, 498, 497, 495, 496, 495, 497, 493, 495, 496, 498, 494, 496, 495, 494, 495,
+    496, 493, 495, 492, 497, 495, 495, 499, 492, 497, 498, 496, 494, 495, 494, 493, 496, 496, 498, 495,
+    496, 498, 494, 492, 493, 497, 493, 494, 494, 496, 497, 496, 494, 495, 496, 494, 497, 495, 493, 497,
+    498, 497, 493, 496, 496, 494, 496, 496, 493, 495, 496, 494, 494, 498, 497, 497, 498, 494, 498, 493,
+    495, 493, 497, 497, 492, 495, 495, 497, 494, 496, 499, 497, 493, 493, 496, 497, 496, 491, 495, 498,
+    500, 494, 494, 493, 491, 494, 492, 497, 493, 497, 495, 499, 496, 496, 495, 492, 493, 494, 496, 495,
+    496, 496, 496, 493, 495, 494, 495, 494, 496, 498, 499, 496, 497, 498, 494, 494, 493, 497, 497, 497,
+    497, 495, 494, 493, 493, 493, 494, 493, 496, 493, 493, 493, 494, 495, 498, 495, 495, 496, 496, 496,
+    495, 497, 497, 496, 494, 496, 497, 497, 499, 495, 496, 495, 492, 495, 496, 495, 498, 496, 496, 494,
+    497, 496, 495, 493, 497, 496, 496, 497, 496, 497, 498, 496, 495, 494, 497, 497, 495, 495, 496, 495,
+    494, 493, 494, 497, 491, 495, 497, 496, 496, 496, 493, 497, 494, 495, 495, 493, 496, 500, 494, 493,
+    495, 499, 496, 499, 496, 494, 493, 496, 495, 496, 494, 492, 494, 493, 498, 496, 495, 496, 497, 497,
+    493, 496, 498, 492, 496, 497, 496, 492, 495, 495, 495, 491, 496, 493, 494, 495, 496, 496, 493, 493,
+    496, 495, 494, 492, 494, 498, 495, 496, 493, 496, 498, 494, 492, 494, 494, 497, 498, 496, 496, 498,
+    493, 497, 495, 492, 491, 493, 494, 494, 495, 494, 493, 496, 496, 496, 497, 498, 493, 495, 492, 495,
+    497, 493, 495, 497, 500, 493, 496, 496, 497, 493, 493, 495, 494, 493, 493, 496, 498, 495, 495, 498,
+    495, 493, 493, 494, 493, 496, 496, 500, 493, 497, 495, 496, 493, 495, 493, 493, 496, 497, 495, 494,
+    494, 495, 494, 496, 496, 493, 495, 497, 497, 496, 492, 493, 497, 492, 497, 498, 493, 496, 496, 494,
+    495, 496, 495, 493, 498, 494, 496, 497, 494, 497, 497, 496, 498, 494, 495, 498, 495, 496, 493, 494,
+    497, 494, 496, 498, 497, 497, 494, 494, 494, 496, 494, 491, 493, 493, 493, 497, 495, 493, 493, 495,
+    496, 497, 493, 497, 494, 495, 495, 494, 496, 492, 495, 494, 493, 495, 497, 497, 495, 496, 497, 495,
+    494, 496, 493, 496, 496, 496, 492, 494, 495, 493, 495, 497, 499, 494, 495, 496, 494, 496, 494, 494,
+    496, 498, 493, 494, 497, 493, 494, 496, 496, 495, 494, 493, 498, 500, 495, 496, 497, 494, 494, 495,
+    496, 495, 497, 492, 498, 498, 494, 493, 498, 493, 496, 492, 493, 495, 492, 495, 495, 495, 494, 497,
+    494, 493, 497, 493, 498, 497, 498, 496, 497, 495, 495, 496, 495, 497, 498, 495, 492, 495, 492, 492,
+    494, 494, 498, 497, 497, 498, 493, 497, 496, 498, 496, 495, 493, 494, 493, 497, 496, 493, 493, 496,
+    494, 494, 495, 492, 498, 494, 495, 498, 497, 495, 496, 497, 498, 494, 495, 496, 495, 496, 496, 496,
+    495, 496, 497, 499, 497, 497, 497, 497, 492, 496, 494, 496, 494, 492, 497, 493, 497, 494, 494, 493,
+    496, 496, 496, 496, 498, 494, 492, 497, 494, 495, 495, 495, 495, 496, 493, 496, 495, 498, 494, 495,
+    493, 496, 495, 497, 499, 496, 495, 491, 493, 499, 496, 497, 493, 495, 493, 494, 494, 493, 497, 495,
+    498, 496, 494, 493, 493, 493, 498, 493, 493, 497, 496, 498, 495, 492, 495, 494, 495, 497, 495, 497,
+    496, 496, 497, 495, 497, 497, 494, 494, 496, 495, 495, 494, 498, 499, 493, 495, 497, 497, 496, 495,
+    498, 495, 495, 492, 496, 497, 494, 496, 498, 496, 497, 494, 496, 496, 496, 496, 498, 500, 497, 498,
+    493, 497, 496, 495, 496, 496, 495, 495, 496, 493, 498, 495, 496, 495, 496, 493, 496, 495, 491, 495,
+    493, 494, 495, 493, 497, 498, 495, 492, 495, 495, 494, 496, 499, 496, 497, 495, 495, 497, 498, 497
+};
+
+
 void capture_engine_init() {
     // turn on gpiob
     RCC->AHB2ENR |= RCC_AHB2ENR_GPIOBEN;
@@ -120,14 +179,17 @@ void capture_engine_init() {
     TIM2->CCMR2 &= ~TIM_CCMR2_IC3F_Msk;
     // TIM2->CCMR2 |= (3u << TIM_CCMR2_IC3F_Pos);
 
-    // cap cmp channel 3 will read rising edges
-    TIM2->CCER &= ~(TIM_CCER_CC3P_Msk | TIM_CCER_CC3NP_Msk);
+    // // cap cmp channel 3 will read rising edges
+    // TIM2->CCER &= ~(TIM_CCER_CC3P_Msk | TIM_CCER_CC3NP_Msk);
+    
+    // cap cmp channel 3 will read rising and falling edges
+    TIM2->CCER |= TIM_CCER_CC3P_Msk | TIM_CCER_CC3NP_Msk;
 
     // no prescalar for inp cap channel 3
     TIM2->CCMR2 &= ~TIM_CCMR2_IC3PSC_Msk;
 
     // enable cap compare for channel 3
-    TIM2->CCER |= (1u << TIM_CCER_CC3E_Pos);
+    TIM2->CCER |= TIM_CCER_CC3E_Msk;
 
     // // interrupt enable channel 3
     // TIM2->DIER |= (1u << TIM_DIER_CC3IE_Pos);
@@ -199,6 +261,7 @@ void capture_engine_start(const menu_settings_t* settings) {
     measurement_complete = false;
     memset(result.bins, 0u, sizeof(result.bins[0]) * BINS_SIZE);
     memset(result.measurements, 0u, sizeof(result.measurements[0]) * MENU_N_FIXED);
+    memset(result.high_times, 0u, sizeof(result.high_times[0]) * MENU_N_FIXED);
     result.out_high = 0;
     result.out_low = 0;
     result.measurements_count = 0;
@@ -206,8 +269,19 @@ void capture_engine_start(const menu_settings_t* settings) {
     tolerance_upper = settings->E + settings->T;
     // measurements_per_run = settings->N;
 
+    // high_pin = false;
+    edge_rose = false;
+    edge_fell = false;
+    rising_ts = 0;
+    high_time = 0;
+
     tim2_channel3_enable_interrupt();
 }
+
+
+
+
+
 
 void TIM2_IRQHandler() {
     // static uint32_t delta = 0;
@@ -220,40 +294,52 @@ void TIM2_IRQHandler() {
     // consume/reset time/flag
     uint32_t now = TIM2->CCR3;
 
-    if (first_edge) {
+    volatile bool high_pin = (GPIOB->IDR & GPIO_IDR_ID10_Msk) != 0u;
+
+    if (first_edge && high_pin) {
         first_edge = false;
         prev = now;
         edge_detected = true;
+        rising_ts = now;
+        edge_rose = true;
         return;
     }
 
-    uint32_t period = now - prev;
-    prev = now;
-    edge_detected = true;
 
-    // if (measurement_complete) {
-    //     return;
-    // }
+    if (high_pin) {
+        if (edge_rose && edge_fell) {
+            uint32_t period = now - prev;
+            prev = now;
+            edge_detected = true;
 
-    if (period < tolerance_lower) {
-        result.out_low++;
-    } else if (period > tolerance_upper) {
-        result.out_high++;
+            if (period < tolerance_lower) {
+                result.out_low++;
+            } else if (period > tolerance_upper) {
+                result.out_high++;
+            } else {
+                result.bins[period] += 1;
+            }
+
+            result.measurements[result.measurements_count] = period;
+            result.high_times[result.measurements_count] = high_time;
+            result.measurements_count++;
+
+            measurement_complete = result.measurements_count >= MENU_N_FIXED;
+
+            if (measurement_complete) {
+                tim2_channel3_disable_interrupt();
+                return;
+            }
+        }
+
+        rising_ts = now;
+        edge_rose = true;
+        edge_fell = false;
     } else {
-        result.bins[period] += 1;
-    }
-    // else {
-    //     trash_data = true;
-    //     trash_period = period;
-    // }
-
-    result.measurements[result.measurements_count] = period;
-    result.measurements_count++;
-
-    measurement_complete = result.measurements_count >= MENU_N_FIXED;
-
-    if (measurement_complete) {
-        tim2_channel3_disable_interrupt();
+        if (edge_rose) {
+            high_time = now - rising_ts;
+            edge_fell = true;
+        }
     }
 }
 
@@ -262,12 +348,15 @@ bool capture_engine_complete() { return measurement_complete; }
 void fill_dummy_data() {
     memset(result.measurements, 0u, sizeof(result.measurements[0]) * MENU_N_FIXED);
     memset(result.bins, 0u, sizeof(result.bins[0]) * BINS_SIZE);
+    memset(result.high_times, 0u, sizeof(result.high_times[0]) * MENU_N_FIXED);
     result.out_low = 0;
     result.out_high = 0;
 
     for (uint32_t i = 0; i < 1000; i++) {
         uint32_t period = dummy_data[i];
+        uint32_t high_time = dummy_high_times[i];
         result.measurements[i] = period;
+        result.high_times[i] = high_time;
 
         if (period < tolerance_lower) {
             result.out_low++;

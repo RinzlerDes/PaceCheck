@@ -4,6 +4,7 @@
 
 #define STARTUP_PERIOD 100000u
 #define BINS_SIZE (PERIOD_MAX + TOLERANCE_MAX + 1)
+#define HIGH_TIMES_BINS_SIZE (PERIOD_MAX + TOLERANCE_MAX + 1)
 
 typedef struct {
     uint32_t out_low;
@@ -11,11 +12,12 @@ typedef struct {
     uint32_t measurements_count;
     uint32_t bins[BINS_SIZE];
     uint32_t measurements[MENU_N_FIXED];
+    uint32_t high_times[MENU_N_FIXED]; 
 } capture_engine_result;
 
 // extern volatile bool my_flag;
 // extern volatile uint32_t  my_number;
-extern volatile bool measurement_complete;
+// extern volatile bool measurement_complete;
 // extern volatile bool trash_data;
 // extern volatile uint32_t trash_period;
 
