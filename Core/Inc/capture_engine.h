@@ -8,15 +8,16 @@
 typedef struct {
     uint32_t out_low;
     uint32_t out_high;
-    uint32_t total;
+    uint32_t measurements_count;
     uint32_t bins[BINS_SIZE];
+    uint32_t measurements[MENU_N_FIXED];
 } capture_engine_result;
 
 // extern volatile bool my_flag;
 // extern volatile uint32_t  my_number;
 extern volatile bool measurement_complete;
-extern volatile bool trash_data;
-extern volatile uint32_t trash_period;
+// extern volatile bool trash_data;
+// extern volatile uint32_t trash_period;
 
 void capture_engine_init();
 bool signal_detected(uint32_t period);

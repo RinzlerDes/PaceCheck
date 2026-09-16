@@ -100,6 +100,10 @@ int main(void) {
         startup_reset_counter++;
     }
 
+    oled_clear();
+    printf("Signal detected\n");
+    oled_write_line(0, "Signal detected.");
+
     // static menu_settings_t settings = { 1000u, 50u, MENU_N_FIXED };
     // capture_engine_start(settings);
 

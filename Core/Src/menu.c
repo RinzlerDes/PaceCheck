@@ -82,13 +82,13 @@ static bool validate_e(uint32_t v, const menu_settings_t* s) {
     // printf("rejected: E validator not implemented (your R4 work)\n");
     // return false;
     if (v < PERIOD_MIN) {
-        printf("%lu is below period minimum: %lu\n", v, TOLERANCE_MIN);
+        printf("%lu is below period minimum: %lu\n", v, (unsigned long)PERIOD_MIN);
         return false;
     } else if (v > PERIOD_MAX) {
-        printf("%lu is above period maximum: %lu\n", v, TOLERANCE_MAX);
+        printf("%lu is above period maximum: %lu\n", v, (unsigned long)PERIOD_MAX);
         return false;
     } else if (s->T >= v) {
-        printf("Period: %lu must be greater than tolerance: %lu\n", v, s->T);
+        printf("Tolerance: %lu must be less than period: %lu\n", s->T, v);
         return false;
     }
 
@@ -102,13 +102,14 @@ static bool validate_t(uint32_t v, const menu_settings_t* s) {
     // return false;
 
     if (v < TOLERANCE_MIN) {
-        printf("%lu is below tolerance minimum: %lu\n", v, TOLERANCE_MIN);
+        printf("%lu is below tolerance minimum: %lu\n", v, (unsigned long)TOLERANCE_MIN);
         return false;
     } else if (v > TOLERANCE_MAX) {
-        printf("%lu is above tolerance maximum: %lu\n", v, TOLERANCE_MAX);
+        printf("%lu is above tolerance maximum: %lu\n", v, (unsigned long)TOLERANCE_MAX);
         return false;
     } else if (v >= s->E) {
-        printf("Period: %lu must be greater than tolerance: %lu\n", v, s->T);
+        // printf("Tolerance: %lu must be greater than tolerance: %lu\n", v, s->T);
+        printf("Tolerance: %lu must be less than period: %lu\n", v, s->E);
         return false;
     }
     return true;
@@ -142,6 +143,15 @@ static uint32_t isqrt_u64(uint64_t n) {
     return (uint32_t)answer;
 }
 
+// static void build_bins(capture_engine_result* result) {
+//     static uint32_t bins[BINS_SIZE];
+//     memset(&bins, 0, sizeof(bins[0]) * BINS_SIZE);
+//     for (uint32_t i = 0; i < result->measurements_count; i++) {
+//         uint32_t period = result->measurements[i];
+//         if (period)
+//     }
+// }
+
 static void on_run(const menu_settings_t* s) {
     // (void)s;
     // /* STUDENT TODO (R2/R5-R10/R12).                                      */
@@ -156,11 +166,12 @@ static void on_run(const menu_settings_t* s) {
     capture_engine_start(s);
     while (!capture_engine_complete()) {}
 
-    if (trash_data) {
-        printf("entire test is trash, period is really messed up: %lu, max %lu\n",
-               trash_period,
-               PERIOD_MAX);
-    }
+    // REMOVE
+    // if (trash_data) {
+    //     printf("entire test is trash, period is really messed up: %lu, max %lu\n",
+    //            trash_period,
+    //            PERIOD_MAX);
+    // }
 
     const volatile capture_engine_result* result = capture_engine_result_get();
 
@@ -168,72 +179,94 @@ static void on_run(const menu_settings_t* s) {
     // fill_dummy_data();
 
     bool pass = result->out_high == 0u && result->out_low == 0;
-    uint32_t in_window = result->total - result->out_high - result->out_low;
-    uint32_t min = BINS_SIZE;
+    uint32_t in_window = result->measurements_count - result->out_high - result->out_low;
+    uint32_t min = UINT32_MAX;
     uint32_t max = 0u;
     uint64_t sum = 0u;
-    uint64_t sum2 = 0u;
-    uint32_t tolerance_lower = s->E - s->T;
-    uint32_t tolerance_upper = s->E + s->T;
+    uint64_t sum_squared = 0u;
 
     printf("\n");
     for (uint32_t period = 0u; period < BINS_SIZE; period++) {
-        if (period == tolerance_lower) {
-            printf("Out Of Range Lower ^^^^\n");
-        }
+        // if (period == tolerance_lower) {
+        //     printf("Out Of Range Lower ^^^^\n");
+        // }
 
         uint32_t period_count = result->bins[period];
 
         if (period_count != 0u) {
-            sum += (uint64_t)period * period_count;
-            sum2 += (uint64_t)period * period * period_count;
+            // sum += (uint64_t)period * period_count;
+            // sum2 += (uint64_t)period * period * period_count;
 
-            if (period < min) {
-                min = period;
-            } else if (period > max) {
-                max = period;
-            }
+            // if (period < min) {
+            //     min = period;
+            // } else if (period > max) {
+            //     max = period;
+            // }
             printf("%lu: %lu\n", period, result->bins[period]);
         }
 
-        if (period == tolerance_upper) {
-            printf("Out Of Range Upper vvvv\n");
-        }
+        // if (period == tolerance_upper) {
+        //     printf("Out Of Range Upper vvvv\n");
+        // }
     }
     printf("\n");
 
-    uint64_t mean = (sum * 10u + s->N / 2) / s->N;
-    uint64_t variance = 100u * (s->N * (sum2) - (sum * sum)) / (s->N * (s->N - 1));
-    uint32_t sample_standard_deviation = isqrt_u64(variance);
-    uint64_t rate_ppm = (10u * 60000000ull * s->N + sum / 2u) / sum;
+    for (uint32_t i = 0; i < result->measurements_count; i++) {
+        uint32_t period = result->measurements[i];
+        sum += (uint64_t)period;
+        sum_squared += (uint64_t)period * period;
 
-    uint32_t worst_early = s->E - min;
-    uint32_t worst_late = max - s->E;
-    uint32_t worst_largest = worst_early > worst_late ? worst_early : worst_late;
-    // uint32_t margin_to_limit = ;
+        if (period < min) {
+            min = period;
+        }
+
+        if (period > max) {
+            max = period;
+        }
+    }
+
+    uint64_t mean = (sum * 10u + result->measurements_count / 2) / result->measurements_count;
+    uint64_t variance = 100u * (result->measurements_count * (sum_squared) - (sum * sum)) /
+                        (result->measurements_count * (result->measurements_count - 1));
+    uint32_t sample_standard_deviation = isqrt_u64(variance);
+    uint64_t rate_ppm = (10u * 60000000ull * result->measurements_count + sum / 2u) / sum;
+
+    int64_t expected = (int64_t)s->E;
+    int64_t tolerance = (int64_t)s->T;
+
+    int64_t lower_limit = expected - tolerance;
+    int64_t upper_limit = expected + tolerance;
+
+    int64_t worst_early = (int64_t)min - expected;
+    int64_t worst_late = (int64_t)max - expected;
+
+    int64_t lower_margin = (int64_t)min - lower_limit;
+    int64_t upper_margin = upper_limit - (int64_t)max;
+
+    int64_t margin_to_limit = lower_margin < upper_margin ? lower_margin : upper_margin;
 
     printf("Out Low: %lu\n", result->out_low);
-
     printf("Out High: %lu\n", result->out_high);
+    printf("Out Total: %lu\n", result->out_high + result->out_low);
 
     printf("Total: %lu In Window + %lu Out Low + %lu Out High = %lu\n",
            in_window,
            result->out_low,
            result->out_high,
-           result->total);
+           result->measurements_count);
 
     printf("Min: %lu\n", min);
     printf("Max: %lu\n", max);
-    printf("Mean: %lu.%lu\n", (unsigned long)mean / 10, mean % 10);
+    printf("Mean: %lu.%lu\n", (unsigned long)mean / 10, (unsigned long)mean % 10);
     printf("Sample Standard Deviation: %lu.%lu\n",
            sample_standard_deviation / 10,
            sample_standard_deviation % 10);
     printf("Rate: %lu.%lu ppm\n", (unsigned long)rate_ppm / 10u, (unsigned long)rate_ppm % 10u);
-    printf("Worst Early: -%lu\n", worst_early);
-    printf("Worst Late: +%lu\n", worst_late);
-    if (pass) {
-        printf("Margin To Limit: %lu\n", worst_largest);
-    }
+    printf("Worst Early: %ld\n", (long)worst_early);
+    printf("Worst Late: %ld\n", (long)worst_late);
+    // if (pass) {
+    printf("Margin To Limit: %ld\n", (long)margin_to_limit);
+    // }
 
     char* verdict = pass ? "Pass" : "Fail";
     printf("Verdict: %s\n", verdict);
@@ -246,9 +279,9 @@ static void on_run(const menu_settings_t* s) {
     }
 
     oled_clear();
-    oled_printf(0u, "%s\n", verdict);
-    oled_printf(1u, "Min: %ul\n", min);
-    oled_printf(2u, "Max: %ul\n", max);
+    oled_printf(0u, "%s", verdict);
+    oled_printf(1u, "Min: %lu", min);
+    oled_printf(2u, "Max: %lu", max);
 }
 
 /* ==================== END STUDENT SECTIONS ============================== */
