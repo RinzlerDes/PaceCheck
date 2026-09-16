@@ -33,6 +33,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define TOLERANCE_MAX 500
+#define TOLERANCE_MIN 10
+#define PERIOD_MAX 2000
+#define PERIOD_MIN 100
+
 /* R4: the interval count is fixed. A qualification is always full-count. */
 #define MENU_N_FIXED 1000u
 

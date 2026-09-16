@@ -45,100 +45,83 @@
 #include "stm32wbxx.h"
 
 int main(void) {
-  clock_init();
-  console_init();
-  oled_init();
-  rgb_init();
-  capture_engine_init();
+    clock_init();
+    console_init();
+    oled_init();
+    rgb_init();
+    capture_engine_init();
 
-  printf("\n");
-  printf("PC-1000 PaceCheck starter -- SWEN 563 / CMPE 663\n");
-  printf("SYSCLK = %lu Hz (TIM2 kernel clock; 1 us tick needs PSC = ?)\n",
-         (unsigned long)clock_sysclk_hz());
+    printf("\n");
+    printf("PC-1000 PaceCheck starter -- SWEN 563 / CMPE 663\n");
+    printf("SYSCLK = %lu Hz (TIM2 kernel clock; 1 us tick needs PSC = ?)\n",
+           (unsigned long)clock_sysclk_hz());
 
-  (void)loopback_start(1000u);
-  printf(
-      "LOOPBACK running: 1000 us square on PD12 (Arduino D2) -- "
-      "jumper D2 to D5 for the capture-path self-test.\n");
-  printf(
-      "Type a line (e.g. 'e 1500') and press Enter; "
-      "'menu' enters the CONFIG shell.\n\n");
+    (void)loopback_start(1000u);
+    printf(
+        "LOOPBACK running: 1000 us square on PD12 (Arduino D2) -- "
+        "jumper D2 to D5 for the capture-path self-test.\n");
+    printf(
+        "Type a line (e.g. 'e 1500') and press Enter; "
+        "'menu' enters the CONFIG shell.\n\n");
 
-  oled_write_line(0, "PC-1000  PaceCheck");
-  oled_write_line(2, "Starter smoke test");
-  oled_write_line(4, "Console: 115200 8N1");
-  rgb_set(0u, 0u, 32u);
+    oled_write_line(0, "PC-1000  PaceCheck");
+    oled_write_line(2, "Starter smoke test");
+    oled_write_line(4, "Console: 115200 8N1");
+    rgb_set(0u, 0u, 32u);
 
-  static const uint8_t colors[][3] = {
-      {32u, 0u, 0u},
-      {0u, 32u, 0u},
-      {0u, 0u, 32u},
-      {32u, 32u, 32u},
-  };
-  unsigned color_idx = 0u;
+    static const uint8_t colors[][3] = {
+        {32u, 0u, 0u},
+        {0u, 32u, 0u},
+        {0u, 0u, 32u},
+        {32u, 32u, 32u},
+    };
+    unsigned color_idx = 0u;
 
-  // R1
-  char line[80];
-  char* tok[8];
-  oled_clear();
-  uint32_t startup_reset_counter = 0;
-
-  for (;;) {
-    my_flag = false;
-    uint32_t startup = TIM2->CNT;
-    uint32_t startup_period = 100000;
-
-    while ((TIM2->CNT - startup) < startup_period) {
-      if (my_flag) {
-        break;
-      }
-    }
-
-    if (my_flag) {
-        oled_clear();
-      break;
-    }
-
+    // R1
+    uint32_t startup_reset_counter = 0;
     char* message = "NO DUT SIGNAL";
     char* message2 = "(no edge within 100 ms)";
     char* message3 = "> keypress to retry";
     char message4[21];
-    snprintf(message4, sizeof(message4), "retry count: %u", startup_reset_counter);
 
-    printf("%s\n", message);
-    printf("%s\n", message2);
-    printf("%s\n", message4);
-    printf("%s\n", message3);
+    while (!signal_detected(STARTUP_PERIOD)) {
+        snprintf(message4, sizeof(message4), "retry count: %lu", startup_reset_counter);
+        printf("%s\n", message);
+        printf("%s\n", message2);
+        printf("%s\n", message4);
+        printf("%s\n", message3);
 
-    oled_write_line(0, message);
-    oled_write_line(1, message2);
-    oled_write_line(3, message4);
-    oled_write_line(4, message3);
+        oled_write_line(0, message);
+        oled_write_line(1, message2);
+        oled_write_line(3, message4);
+        oled_write_line(4, message3);
 
-    console_getc();
-    startup_reset_counter++;
-  }
-  capture_engine_init();
-
-  for (;;) {
-    char line[80];
-    char* tok[8];
-
-    printf("> ");
-    console_read_line(line, sizeof line);
-
-    int argc = console_tokenize(line, tok, 8);
-    if (argc == 1 && strcmp(tok[0], "menu") == 0) {
-      menu_loop(); /* does not return (R11)        */
-    }
-    printf("%d token(s)\n", argc);
-    for (int i = 0; i < argc; i++) {
-      printf("  [%d] \"%s\"\n", i, tok[i]);
+        console_getc();
+        startup_reset_counter++;
     }
 
-    oled_printf(6, "You typed: %s", (argc > 0) ? tok[0] : "(nothing)");
+    // static menu_settings_t settings = { 1000u, 50u, MENU_N_FIXED };
+    // capture_engine_start(settings);
 
-    rgb_set(colors[color_idx][0], colors[color_idx][1], colors[color_idx][2]);
-    color_idx = (color_idx + 1u) % 4u;
-  }
+    for (;;) {
+        char line[80];
+        char* tok[8];
+
+        printf("> ");
+        console_read_line(line, sizeof line);
+
+        int argc = console_tokenize(line, tok, 8);
+        if (argc == 1 && strcmp(tok[0], "menu") == 0) {
+            menu_loop(); /* does not return (R11)        */
+        }
+        printf("%d token(s)\n", argc);
+        for (int i = 0; i < argc; i++) {
+            printf("  [%d] \"%s\"\n", i, tok[i]);
+        }
+
+        oled_printf(6, "You typed: %s", (argc > 0) ? tok[0] : "(nothing)");
+
+        rgb_set(colors[color_idx][0], colors[color_idx][1], colors[color_idx][2]);
+        color_idx = (color_idx + 1u) % 4u;
+    }
 }
